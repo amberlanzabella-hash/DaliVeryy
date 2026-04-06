@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  {% load static %}
+  <link rel="stylesheet" href="{% static 'accounts/auth/style.css' %}">
+  <title>Auth</title>
+  <style>
+    .msg-wrap{position:fixed; top:18px; left:50%; transform:translateX(-50%); width:min(520px, 92vw); z-index:9999;}
+    .msg{background:#fff; border-radius:12px; padding:10px 14px; margin:8px 0; box-shadow:0 10px 30px rgba(0,0,0,.12); font-size:14px;}
+    .msg.error{border-left:4px solid #e11d48;}
+    .msg.success{border-left:4px solid #16a34a;}
+    .msg.info{border-left:4px solid #2563eb;}
+    .otp-row{display:flex; gap:10px; width:100%;}
+    .otp-row input{flex:1;}
+    .otp-row button{white-space:nowrap; padding:10px 14px;}
+    .tiny{font-size:12px; opacity:.8; margin-top:6px;}
+  </style>
+</head>
+
+<body>
+  {% if messages %}
+  <div class="msg-wrap">
+    {% for message in messages %}
+      <div class="msg {% if message.tags %}{{ message.tags }}{% endif %}">{{ message }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="container {% if start_panel == 'register' %}active{% endif %}" id="container">
+
+    <!-- SIGN UP -->
+    <div class="form-container sign-up">
+      <form method="post" action="{% url 'register' %}" autocomplete="off">
+        {% csrf_token %}
+        <h1>Create Account</h1>
+
+        <span>Use your email for registration</span>
+
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="email" name="email" placeholder="Email" required>
+
+        <input type="password" name="password1" placeholder="Password" required>
+        <input type="password" name="password2" placeholder="Confirm Password" required>
+
+        <div class="otp-row">
+          <input type="text" name="otp" placeholder="OTP (6 digits)" maxlength="6" inputmode="numeric" required>
+          <button type="button" id="sendOtpBtn">Send OTP</button>
+        </div>
+        <div class="tiny" id="otpStatus"></div>
+
+        <button type="submit">Create Account</button>
+      </form>
+    </div>
+
+    <!-- SIGN IN -->
+    <div class="form-container sign-in">
+      <form method="post" action="{% url 'login' %}" autocomplete="off">
+        {% csrf_token %}
+        <h1>Sign In</h1>
+
+        <span>Use your username and password</span>
+
+        <input type="text" name="username" placeholder="Username" required>
+        <input type="password" name="password" placeholder="Password" required>
+
+        <button type="submit">Login</button>
+      </form>
+    </div>
+
+    <!-- TOGGLE PANEL -->
+    <div class="toggle-container">
+      <div class="toggle">
+        <div class="toggle-panel toggle-left">
+          <h1>Welcome Back!</h1>
+          <p>Enter your details to login</p>
+          <button class="hidden" id="login" type="button">Sign In</button>
+        </div>
+        <div class="toggle-panel toggle-right">
+          <h1>Hello!</h1>
+          <p>Register with your details to start using the app</p>
+          <button class="hidden" id="register" type="button">Sign Up</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="{% static 'accounts/auth/script.js' %}"></script>
+  <script>
+    // Send OTP via fetch (same endpoint used by backend)
+    (function(){
+      const btn = document.getElementById("sendOtpBtn");
+      if(!btn) return;
+
+      const statusEl = document.getElementById("otpStatus");
+      const emailInput = document.querySelector('input[name="email"]');
+      const csrfInput = document.querySelector('.sign-up input[name="csrfmiddlewaretoken"]');
+
+      function setStatus(text, ok){
+        if(!statusEl) return;
+        statusEl.textContent = text || "";
+        statusEl.style.color = ok ? "#16a34a" : "#e11d48";
+      }
+
+      btn.addEventListener("click", async () => {
+        const email = (emailInput?.value || "").trim();
+        if(!email){
+          setStatus("Please enter your email first.", false);
+          return;
+        }
+        btn.disabled = true;
+        setStatus("Sending OTP...", true);
+
+        try{
+          const resp = await fetch("{% url 'send_otp' %}", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+              "X-CSRFToken": csrfInput?.value || "",
+              "X-Requested-With": "XMLHttpRequest",
+              "Accept": "application/json"
+            },
+            body: new URLSearchParams({email})
+          });
+          const data = await resp.json().catch(() => ({}));
+          if(resp.ok && data.ok){
+            setStatus(data.message || "OTP sent! Check your email.", true);
+          }else{
+            setStatus(data.error || "Failed to send OTP.", false);
+          }
+        }catch(e){
+          setStatus("Network error while sending OTP.", false);
+        }finally{
+          btn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
