@@ -1,4 +1,5 @@
 import json
+import logging
 import random
 import time
 from django.conf import settings
@@ -10,6 +11,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .models import Profile, PendingOTP, PasswordResetOTP
+
+logger = logging.getLogger(__name__)
 
 # OTP validity window in seconds.
 OTP_TTL_SECONDS = 300
@@ -51,11 +54,12 @@ def send_otp_view(request):
 
     otp = f"{random.randint(100000, 999999)}"
     expires_at = int(time.time()) + OTP_TTL_SECONDS
-    PendingOTP.objects.update_or_create(email=email, defaults={'code': otp, 'expires_at': expires_at})
     try:
+        PendingOTP.objects.update_or_create(email=email, defaults={'code': otp, 'expires_at': expires_at})
         _send_email('Your DaliVery Verification Code', f'Your DaliVery verification code is: {otp}', email)
     except Exception as e:
-        return JsonResponse({'ok': False, 'error': f'Failed to send email: {e}'}, status=500)
+        logger.exception('Failed to send registration OTP for %s', email)
+        return JsonResponse({'ok': False, 'error': f'Failed to send OTP: {e}'}, status=500)
     return JsonResponse({'ok': True, 'message': 'OTP sent to your email.'})
 
 
@@ -171,11 +175,12 @@ def send_reset_otp_view(request):
         return JsonResponse({'ok': False, 'error': 'No account found with that email.'}, status=404)
     otp = f"{random.randint(100000, 999999)}"
     expires_at = int(time.time()) + OTP_TTL_SECONDS
-    PasswordResetOTP.objects.update_or_create(email=email, defaults={'code': otp, 'expires_at': expires_at})
     try:
+        PasswordResetOTP.objects.update_or_create(email=email, defaults={'code': otp, 'expires_at': expires_at})
         _send_email('Your DaliVery Password Reset Code', f'Your password reset code is: {otp}', email)
     except Exception as e:
-        return JsonResponse({'ok': False, 'error': f'Failed to send email: {e}'}, status=500)
+        logger.exception('Failed to send reset OTP for %s', email)
+        return JsonResponse({'ok': False, 'error': f'Failed to send reset OTP: {e}'}, status=500)
     return JsonResponse({'ok': True, 'message': 'Reset OTP sent.'})
 
 
