@@ -7,12 +7,33 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
-SECRET_KEY = 'django-insecure-njx%qj!*y$y2)p@3=v0u2z-4cu8fe3$@rqr-oy^5esf@!qyc*&'
 
-DEBUG = True
+def env_flag(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.lower() in ("true", "1", "yes", "on")
 
-# Allow LAN devices to reach the backend during development.
-ALLOWED_HOSTS = ["*"]
+
+def env_list(name: str, default: list[str]) -> list[str]:
+    raw_value = os.getenv(name)
+    if not raw_value:
+        return default
+    return [item.strip() for item in raw_value.split(",") if item.strip()]
+
+
+SECRET_KEY = os.getenv(
+    "SECRET_KEY",
+    "django-insecure-njx%qj!*y$y2)p@3=v0u2z-4cu8fe3$@rqr-oy^5esf@!qyc*&",
+)
+
+DEBUG = env_flag("DEBUG", True)
+
+# Allow local development plus explicitly configured production hosts.
+ALLOWED_HOSTS = env_list(
+    "ALLOWED_HOSTS",
+    ["127.0.0.1", "localhost", ".onrender.com"],
+)
 
 # Django apps that make up the project.
 INSTALLED_APPS = [
@@ -33,6 +54,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     # CSRF disabled for API endpoints (we use csrf_exempt on views)
@@ -42,12 +64,24 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-# CORS — allow React dev server
-CORS_ALLOW_ALL_ORIGINS = True
+# CORS — allow configured frontend origins in production.
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    [
+        "http://127.0.0.1:5173",
+        "http://localhost:5173",
+        "http://127.0.0.1:5175",
+        "http://localhost:5175",
+    ],
+)
+CORS_ALLOW_ALL_ORIGINS = DEBUG and not os.getenv("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
 
 SESSION_COOKIE_SAMESITE = "None"
-SESSION_COOKIE_SECURE = False  # True in production with HTTPS
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS", CORS_ALLOWED_ORIGINS)
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -89,8 +123,9 @@ TIME_ZONE = 'Asia/Manila'
 USE_I18N = True
 USE_TZ = True
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedStaticFilesStorage'
 
-# ── SMTP / Email ──────────────────────────────────────────────────────────────
 # SMTP settings used for OTP and password reset emails.
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")

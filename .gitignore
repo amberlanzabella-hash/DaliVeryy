@@ -6,6 +6,6 @@ backend/backend/.venv/
 backend/backend/__pycache__/
 backend/backend/*.pyc
 backend/backend/db.sqlite3
+backend/backend/staticfiles/
 
 *.dump
-
