@@ -40,6 +40,12 @@ services:
         sync: false
       - key: DEFAULT_FROM_EMAIL
         sync: false
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: BREVO_SENDER_NAME
+        value: "DaliVery"
 
 databases:
   - name: dalivery-db

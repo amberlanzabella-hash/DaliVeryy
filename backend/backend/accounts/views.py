@@ -2,6 +2,8 @@ import json
 import logging
 import random
 import time
+
+import requests
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
@@ -30,6 +32,33 @@ def _read_body(request):
 
 # Send OTP emails using the SMTP settings from environment variables.
 def _send_email(subject: str, message: str, email: str):
+    if settings.BREVO_API_KEY:
+        sender_email = settings.BREVO_SENDER_EMAIL or settings.DEFAULT_FROM_EMAIL
+        if not sender_email:
+            raise ValueError('BREVO_SENDER_EMAIL or DEFAULT_FROM_EMAIL must be set.')
+
+        response = requests.post(
+            'https://api.brevo.com/v3/smtp/email',
+            headers={
+                'accept': 'application/json',
+                'api-key': settings.BREVO_API_KEY,
+                'content-type': 'application/json',
+            },
+            json={
+                'sender': {
+                    'name': settings.BREVO_SENDER_NAME,
+                    'email': sender_email,
+                },
+                'to': [{'email': email}],
+                'subject': subject,
+                'textContent': message,
+            },
+            timeout=30,
+        )
+        if not response.ok:
+            raise RuntimeError(f'Brevo API error {response.status_code}: {response.text[:300]}')
+        return
+
     send_mail(
         subject=subject,
         message=message,
